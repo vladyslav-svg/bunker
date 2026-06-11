@@ -194,6 +194,8 @@ let ch  = null;   // current game channel
 let H   = {};     // host game state
 let P   = {};     // player game state
 let _joinTimeout  = null;
+let _joinInterval = null;
+let _joinAttempts = 0;
 
 // ── Connection readiness ─────────────────────────────────────
 function initAbly(){
@@ -422,7 +424,7 @@ function joinGame(){
   $('join-err').textContent='';
   if(code.length!==4){$('join-err').textContent='Enter a 4-letter game code';return}
 
-  P={code,name,phase:'lobby',card:null,meta:null,round:1,aliveCount:0,totalCount:0,eliminated:false};
+  P={code,name,phase:'joining',card:null,meta:null,round:1,aliveCount:0,totalCount:0,eliminated:false};
   localStorage.setItem('bunker-last',JSON.stringify({code,name}));
 
   // Subscribe to host messages on this game's channel
@@ -435,20 +437,31 @@ function joinGame(){
     onPlayerReceive(d);
   });
 
-  // Send join once channel is attached
+  // Send join once channel is attached, retry every 3s
+  clearInterval(_joinInterval);
+  clearTimeout(_joinTimeout);
+  _joinAttempts = 0;
+
   ch.attach(err=>{
     if(err){ showJoinErr('Connection error. Try again.'); resetJoinBtn(); return; }
     ch.presence.enter();
-    ch.publish('p', {type:'join', name});
+    const sendJoin = ()=>{
+      _joinAttempts++;
+      ch.publish('p', {type:'join', name});
+      renderPlayerLobby('connecting');
+    };
+    sendJoin();
+    _joinInterval = setInterval(sendJoin, 3000);
   });
 
-  // Timeout if no ack in 10s
+  // Timeout if no ack in 15s
   _joinTimeout = setTimeout(()=>{
-    if(P.phase==='lobby'){
+    clearInterval(_joinInterval);
+    if(P.phase==='joining'){
       showJoinErr('Game not found. Check the code.');
       resetJoinBtn();
     }
-  }, 10000);
+  }, 15000);
 
   $('btn-do-join').disabled=true;
   $('btn-do-join').innerHTML='<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Connecting…';
@@ -457,6 +470,8 @@ function joinGame(){
 }
 
 function goHome(){
+  clearTimeout(_joinTimeout);
+  clearInterval(_joinInterval);
   if(ch){try{ch.presence.leave();ch.unsubscribe();ch.detach();}catch(e){} ch=null;}
   H={}; P={};
   go('s-welcome');
@@ -475,6 +490,7 @@ function showJoinErr(msg){
 function onPlayerReceive(msg){
   if(msg.type==='ack'){
     clearTimeout(_joinTimeout);
+    clearInterval(_joinInterval);
     P.phase='lobby';
     resetJoinBtn();
     renderPlayerLobby('waiting');
@@ -504,7 +520,8 @@ function renderPlayerLobby(state){
     <div style="text-align:center;padding:2.5rem 0 1.5rem">
       ${state==='connecting'
         ?`<i class="ti ti-loader-2" style="font-size:44px;color:var(--fg3);animation:spin 1s linear infinite"></i>
-           <h2 style="margin-top:1rem">Connecting to host…</h2>`
+           <h2 style="margin-top:1rem">Connecting to host…</h2>
+           <p style="margin-top:.35rem;font-size:13px">${_joinAttempts>1?`Retrying… (attempt ${_joinAttempts})`:'Sending join request…'}</p>`
         :`<i class="ti ti-loader-2" style="font-size:44px;color:var(--fg3);animation:spin 1s linear infinite"></i>
            <h2 style="margin-top:1rem">Waiting for host to start</h2>`}
       <p style="margin-top:.5rem">Game code: <strong>${P.code}</strong></p>
