@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BUNKER Online</title>
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ably@2/build/ably.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
 :root{--bg:#fff;--bg2:#f5f5f4;--fg:#1c1c1b;--fg2:#6b6b68;--fg3:#9b9b98;--b:rgba(0,0,0,0.12);--b2:rgba(0,0,0,0.22);--acc:#185fa5;--acc-bg:#e6f1fb;--dan:#a32d2d;--dan-bg:#fcebeb;--ok:#3b6d11;--ok-bg:#eaf3de;--r:12px;--rs:8px}
@@ -71,7 +71,7 @@ input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,1
   <button class="btn btn-p" id="btn-host" onclick="go('s-host-config')" disabled><i class="ti ti-crown"></i> Host a game</button>
   <button class="btn" id="rejoin-btn" style="display:none" onclick="tryRejoin()"><i class="ti ti-refresh"></i> Rejoin last game</button>
   <button class="btn" id="btn-join" onclick="go('s-join')" disabled><i class="ti ti-login"></i> Join a game</button>
-  <p style="text-align:center;margin-top:1.25rem;font-size:12px;color:var(--fg3)">Peer-to-peer via WebRTC · host phone is the server</p>
+  <p style="text-align:center;margin-top:1.25rem;font-size:12px;color:var(--fg3)">Real-time sync via Ably · works on any network</p>
 </div>
 
 <!-- HOST CONFIG -->
@@ -177,45 +177,34 @@ function makeQR(text){try{const q=qrcode(0,'M');q.addData(text);q.make();return 
 
 // ============================================================
 // PEERJS — host peer registers with game code as ID.
-// Players connect directly to the host (P2P via WebRTC).
-// Card data is sent directly host→player — no shared database.
+// Real-time sync via Ably (WebSocket relay — works on any network).
+// Get a FREE key at ably.com (no credit card). Free tier: 100 connections, 6M msg/month.
 // ============================================================
 
-// Shared PeerJS instance (reused for both host and player roles)
-let myPeer = null;
+// ▼▼▼ PASTE YOUR ABLY KEY HERE ▼▼▼
+const ABLY_KEY = 'DYP7Hg.9QLv6w:lNDu75VTjbcRFjRYCZc_P5wqUPI2H0fDoCYi-174bVI';
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-// HOST state
-let hostConns = {};  // uid → DataConnection
-let H = {};          // host game state
+// Stable per-session player ID
+let myId = sessionStorage.getItem('bunkr-id');
+if(!myId){ myId = Math.random().toString(36).slice(2,12); sessionStorage.setItem('bunkr-id', myId); }
 
-// PLAYER state
-let hostConn = null;
-let P = {};          // player game state
-
-// ICE servers: STUN + free public TURN relay (Open Relay Project)
-// TURN is needed when two devices are on different networks / behind strict NAT
-const ICE_CFG = {
-  config: {
-    iceServers: [
-      {urls: 'stun:stun.l.google.com:19302'},
-      {urls: 'stun:stun1.l.google.com:19302'},
-      {urls: 'turn:openrelay.metered.ca:80',              username:'openrelayproject', credential:'openrelayproject'},
-      {urls: 'turn:openrelay.metered.ca:443',             username:'openrelayproject', credential:'openrelayproject'},
-      {urls: 'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
-    ]
-  }
-};
+let ab  = null;   // Ably.Realtime instance
+let ch  = null;   // current game channel
+let H   = {};     // host game state
+let P   = {};     // player game state
+let _joinTimeout  = null;
 
 // ── Connection readiness ─────────────────────────────────────
-function initPeer(){
-  // Create an anonymous peer just to establish connectivity for the welcome screen
-  myPeer = new Peer(ICE_CFG);
-  myPeer.on('open', () => setConnBadge(true));
-  myPeer.on('error', e => {
-    if(e.type==='unavailable-id'||e.type==='peer-unavailable')return; // expected
-    setConnBadge(false,'Error: '+e.type);
-  });
-  myPeer.on('disconnected', ()=>setConnBadge(false,'Disconnected'));
+function initAbly(){
+  if(!ABLY_KEY||ABLY_KEY==='YOUR_ABLY_KEY_HERE'){
+    setConnBadge(false,'Paste ABLY_KEY in the file');
+    return;
+  }
+  ab = new Ably.Realtime({ key: ABLY_KEY, clientId: myId });
+  ab.connection.on('connected',    ()=> setConnBadge(true));
+  ab.connection.on('disconnected', ()=> setConnBadge(false,'Disconnected'));
+  ab.connection.on('failed',       ()=> setConnBadge(false,'Connection failed'));
 }
 
 function setConnBadge(ok, msg){
@@ -245,55 +234,32 @@ function createGame(){
     players:{},  // uid → {name, joinedAt, cardIdx, eliminated}
     round:1, phase:'lobby', confirming:null
   };
-  hostConns={};
+  // Subscribe to channel for this game code
+  if(ch) ch.detach();
+  ch = ab.channels.get('bunkr-'+code);
 
-  // Destroy old peer if any
-  if(myPeer&&!myPeer.destroyed)myPeer.destroy();
-
-  // Create peer with game code as ID
-  myPeer=new Peer('bunkr-'+code, ICE_CFG);
-
-  myPeer.on('open', ()=>{
-    renderHostLobby();
-    go('s-host-lobby');
-  });
-
-  myPeer.on('error', err=>{
-    if(err.type==='unavailable-id'){
-      // Code taken — retry with new code
-      createGame();
-    } else {
-      alert('Connection error: '+err.type+'. Check internet and try again.');
+  // Listen for player join messages
+  ch.subscribe('p', msg=>{
+    const uid = msg.clientId;
+    const d   = msg.data;
+    if(d.type==='join' && H.phase==='lobby'){
+      H.players[uid]={name:d.name, joinedAt:Date.now(), cardIdx:-1, eliminated:false, disconnected:false};
+      sendToPlayer(uid, {type:'ack'});
+      renderHostLobby();
     }
   });
 
-  // Incoming player connections
-  myPeer.on('connection', conn=>{
-    const uid=conn.peer;
-    conn.on('open',()=>{
-      conn.on('data', msg=>onHostReceive(uid, conn, msg));
-    });
-    conn.on('close',()=>{
-      if(H.players[uid])H.players[uid].disconnected=true;
-      if(H.phase==='lobby')renderHostLobby();
-      else renderHostGame();
-    });
-    conn.on('error',()=>{
-      if(H.players[uid])H.players[uid].disconnected=true;
-    });
+  // Detect player disconnects via presence
+  ch.presence.subscribe('leave', m=>{
+    if(H.players[m.clientId]){
+      H.players[m.clientId].disconnected=true;
+      if(H.phase==='lobby') renderHostLobby(); else renderHostGame();
+    }
   });
-}
+  ch.presence.enter({role:'host'});
 
-// Host receives a message from a player
-function onHostReceive(uid, conn, msg){
-  if(msg.type==='join'){
-    const idx=Object.keys(H.players).length;
-    H.players[uid]={name:msg.name, joinedAt:Date.now(), cardIdx:-1, eliminated:false, disconnected:false};
-    hostConns[uid]=conn;
-    // Acknowledge
-    conn.send({type:'ack', playerCount:Object.keys(H.players).length});
-    renderHostLobby();
-  }
+  renderHostLobby();
+  go('s-host-lobby');
 }
 
 // ── HOST: LOBBY ──────────────────────────────────────────────
@@ -305,6 +271,7 @@ function renderHostLobby(){
 
   $('s-host-lobby').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+      <button class="ib" onclick="goHome()"><i class="ti ti-arrow-left"></i></button>
       <h2 style="margin:0">Waiting for players</h2>
       <span class="badge b-info">${joined.length}/${H.n}</span>
     </div>
@@ -337,14 +304,11 @@ function hostStartGame(){
 
   sorted.forEach(([uid],idx)=>{
     H.players[uid].cardIdx=idx;
-    const conn=hostConns[uid];
-    if(conn&&conn.open){
-      conn.send({
-        type:'game-start',
-        card: H.cards[idx],
-        meta:{ cap:H.cap, n:H.n, cat:H.cat, feats:H.feats }
-      });
-    }
+    sendToPlayer(uid, {
+      type:'game-start',
+      card: H.cards[idx],
+      meta:{ cap:H.cap, n:H.n, cat:H.cat, feats:H.feats }
+    });
   });
 
   H.phase='playing';
@@ -392,27 +356,24 @@ function renderHostGame(){
           </div>
         </div>`}).join('')}
     </div>
-    <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> View scenario</button>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <button class="btn" onclick="goHome()"><i class="ti ti-home"></i> Main menu</button>
+      <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> Scenario</button>
+    </div>`;
 }
 
 function doElim(uid){
   H.players[uid].eliminated=true;
   H.round++;
   H.confirming=null;
-  // Notify the eliminated player
-  const conn=hostConns[uid];
-  if(conn&&conn.open) conn.send({type:'eliminated'});
-  // Broadcast round update to all alive players
+  sendToPlayer(uid, {type:'eliminated'});
   broadcast({type:'round-update', round:H.round,
     aliveCount:Object.values(H.players).filter(p=>!p.eliminated&&p.joinedAt).length});
   renderHostGame();
 }
 
-function broadcast(msg){
-  Object.entries(hostConns).forEach(([uid,conn])=>{
-    if(!H.players[uid]?.eliminated&&conn.open) conn.send(msg);
-  });
-}
+function sendToPlayer(uid, msg){ ch.publish('h', {...msg, to:uid}); }
+function broadcast(msg){ ch.publish('h', {...msg, to:'all'}); }
 
 function viewCard(uid){
   const p=H.players[uid];
@@ -464,20 +425,30 @@ function joinGame(){
   P={code,name,phase:'lobby',card:null,meta:null,round:1,aliveCount:0,totalCount:0,eliminated:false};
   localStorage.setItem('bunker-last',JSON.stringify({code,name}));
 
-  // Always create a fresh peer so error handlers are clean
-  if(myPeer&&!myPeer.destroyed) myPeer.destroy();
-  myPeer=new Peer(ICE_CFG);
+  // Subscribe to host messages on this game's channel
+  if(ch) ch.detach();
+  ch = ab.channels.get('bunkr-'+code);
 
-  myPeer.on('error', err=>{
-    if(err.type==='peer-unavailable'){
-      showJoinErr('Game not found. Check the code.');
-    } else {
-      showJoinErr('Connection error: '+err.type);
-    }
-    resetJoinBtn();
+  ch.subscribe('h', msg=>{
+    const d = msg.data;
+    if(d.to !== myId && d.to !== 'all') return;
+    onPlayerReceive(d);
   });
 
-  myPeer.on('open', ()=>connectToHost(code, name));
+  // Send join once channel is attached
+  ch.attach(err=>{
+    if(err){ showJoinErr('Connection error. Try again.'); resetJoinBtn(); return; }
+    ch.presence.enter();
+    ch.publish('p', {type:'join', name});
+  });
+
+  // Timeout if no ack in 10s
+  _joinTimeout = setTimeout(()=>{
+    if(P.phase==='lobby'){
+      showJoinErr('Game not found. Check the code.');
+      resetJoinBtn();
+    }
+  }, 10000);
 
   $('btn-do-join').disabled=true;
   $('btn-do-join').innerHTML='<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Connecting…';
@@ -485,30 +456,10 @@ function joinGame(){
   go('s-player-lobby');
 }
 
-function connectToHost(code, name){
-  hostConn=myPeer.connect('bunkr-'+code, {reliable:true});
-
-  hostConn.on('open',()=>{
-    hostConn.send({type:'join', name});
-    renderPlayerLobby('waiting');
-    resetJoinBtn();
-  });
-
-  hostConn.on('data', msg=>onPlayerReceive(msg));
-
-  hostConn.on('close',()=>{
-    if(P.phase==='lobby'){
-      showJoinErr('Host not found or disconnected.');
-    } else {
-      renderPlayerGame('Host disconnected — game paused.');
-    }
-    resetJoinBtn();
-  });
-
-  hostConn.on('error', err=>{
-    showJoinErr('Could not connect: '+err.type);
-    resetJoinBtn();
-  });
+function goHome(){
+  if(ch){try{ch.presence.leave();ch.unsubscribe();ch.detach();}catch(e){} ch=null;}
+  H={}; P={};
+  go('s-welcome');
 }
 
 function resetJoinBtn(){
@@ -523,7 +474,9 @@ function showJoinErr(msg){
 // Player receives a message from host
 function onPlayerReceive(msg){
   if(msg.type==='ack'){
+    clearTimeout(_joinTimeout);
     P.phase='lobby';
+    resetJoinBtn();
     renderPlayerLobby('waiting');
   } else if(msg.type==='game-start'){
     P.phase='playing';
@@ -559,7 +512,8 @@ function renderPlayerLobby(state){
     <div class="card" style="text-align:center">
       <p>You joined as <strong>${P.name}</strong></p>
       <p style="font-size:12px;margin-top:.5rem;color:var(--fg3)">Keep this screen open while the host sets up</p>
-    </div>`;
+    </div>
+    <button class="btn" onclick="goHome()" style="margin-top:.5rem"><i class="ti ti-arrow-left"></i> Back to menu</button>`;
 }
 
 // ── PLAYER: GAME SCREEN ───────────────────────────────────────
@@ -583,7 +537,8 @@ function renderPlayerGame(notice){
       <div style="font-weight:500;font-size:14px">${P.meta.cat.name}</div>
       <p style="margin-top:.25rem;font-size:13px">${P.meta.cat.desc}</p>
       <p style="margin-top:.4rem;font-size:12px;color:var(--fg3)">Bunker: ${P.meta.cap} survivors · ${P.meta.cat.dur}</p>
-    </div>`:''}`;
+    </div>`:''}
+    <button class="btn" onclick="goHome()"><i class="ti ti-home"></i> Main menu</button>`;
 }
 
 // ============================================================
@@ -629,7 +584,7 @@ window.addEventListener('load',()=>{
   try{if(JSON.parse(localStorage.getItem('bunker-last')||'{}').code)$('rejoin-btn').style.display='flex'}catch(e){}
 
   // Init connectivity
-  initPeer();
+  initAbly();
 });
 </script>
 </body>
