@@ -115,6 +115,9 @@ input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,1
 <!-- HOST VIEW CARD -->
 <div id="s-host-card" class="scr"></div>
 
+<!-- HOST MY CARD (shown right after game starts) -->
+<div id="s-host-mycard" class="scr"></div>
+
 <!-- HOST SCENARIO -->
 <div id="s-host-scenario" class="scr"></div>
 
@@ -342,14 +345,33 @@ function hostStartGame(){
   });
 
   H.phase='playing';
-  renderHostGame();
-  go('s-host-game');
+  renderHostMyCard();
+  go('s-host-mycard');
+}
+
+// ── HOST: MY CARD (shown right after start) ──────────────────
+function renderHostMyCard(){
+  const p=H.players['__host__'];
+  const card=H.cards[p.cardIdx];
+  $('s-host-mycard').innerHTML=`
+    <div style="text-align:center;padding:1.5rem 0 1rem">
+      <i class="ti ti-building-fortress" style="font-size:40px;color:var(--fg3)"></i>
+      <h2 style="margin-top:.5rem">Your character</h2>
+      <p>Remember it well — you can check back anytime.</p>
+    </div>
+    <div class="card">${cardHTML(card)}</div>
+    <div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:var(--rs);padding:.75rem 1rem;font-size:13px;color:var(--acc);margin-bottom:10px">
+      <strong>${H.cat.name}:</strong> ${H.cat.desc} Bunker holds <strong>${H.cap}</strong> of ${Object.values(H.players).filter(p=>!p.disconnected).length} players.
+    </div>
+    <button class="btn btn-p" onclick="renderHostGame();go('s-host-game')">
+      <i class="ti ti-layout-dashboard"></i> Go to game board
+    </button>`;
 }
 
 // ── HOST: GAME BOARD ─────────────────────────────────────────
 function renderHostGame(){
   const all=Object.entries(H.players)
-    .filter(([,p])=>p&&p.joinedAt)
+    .filter(([,p])=>p&&p.joinedAt!==undefined)
     .sort(([,a],[,b])=>(a.cardIdx??99)-(b.cardIdx??99));
   const alive=all.filter(([,p])=>!p.eliminated);
   const toGo=alive.length-H.cap, done=toGo<=0;
@@ -380,7 +402,11 @@ function renderHostGame(){
           <div style="display:flex;gap:5px;align-items:center">
             ${p.eliminated?`<span class="badge b-d">Out</span>`:
               isHost
-                ?`<button class="btn btn-p btn-sm" onclick="viewCard('__host__')"><i class="ti ti-id"></i> My card</button>`
+                ?(H.confirming==='__host__'
+                  ?`<button class="btn btn-d btn-sm" onclick="doElim('__host__')">Confirm</button>
+                    <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
+                  :`<button class="btn btn-p btn-sm" onclick="viewCard('__host__')"><i class="ti ti-id"></i> My card</button>
+                    <button class="btn btn-sm" onclick="H.confirming='__host__';renderHostGame()" style="color:var(--dan);border-color:var(--dan)">Kick me</button>`)
                 :H.confirming===uid
                   ?`<button class="btn btn-d btn-sm" onclick="doElim('${uid}')">Confirm</button>
                     <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
@@ -389,7 +415,10 @@ function renderHostGame(){
           </div>
         </div>`}).join('')}
     </div>
-    <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> View scenario</button>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <button class="btn btn-p" onclick="renderHostMyCard();go('s-host-mycard')"><i class="ti ti-id"></i> My card</button>
+      <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> Scenario</button>
+    </div>`;
 }
 
 function doElim(uid){
