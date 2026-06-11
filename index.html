@@ -86,7 +86,7 @@ input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,1
       <span id="pc-v" style="font-size:22px;font-weight:600">8</span>
     </div>
     <input type="range" id="pc" min="2" max="20" value="8" step="1" style="width:100%"
-      oninput="$('pc-v').textContent=this.value;$('cap-prev').textContent=Math.max(2,Math.ceil(+this.value/3))">
+      oninput="$('pc-v').textContent=this.value;$('cap-prev').textContent=(+this.value<=5?1:Math.max(2,Math.ceil(+this.value/3)))">
     <div style="display:flex;justify-content:space-between;margin-top:8px">
       <span style="font-size:11px;color:var(--fg3)">2</span>
       <span style="font-size:12px;color:var(--fg2)">Bunker fits <span id="cap-prev">3</span></span>
@@ -199,10 +199,24 @@ let H = {};          // host game state
 let hostConn = null;
 let P = {};          // player game state
 
+// ICE servers: STUN + free public TURN relay (Open Relay Project)
+// TURN is needed when two devices are on different networks / behind strict NAT
+const ICE_CFG = {
+  config: {
+    iceServers: [
+      {urls: 'stun:stun.l.google.com:19302'},
+      {urls: 'stun:stun1.l.google.com:19302'},
+      {urls: 'turn:openrelay.metered.ca:80',              username:'openrelayproject', credential:'openrelayproject'},
+      {urls: 'turn:openrelay.metered.ca:443',             username:'openrelayproject', credential:'openrelayproject'},
+      {urls: 'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
+    ]
+  }
+};
+
 // ── Connection readiness ─────────────────────────────────────
 function initPeer(){
   // Create an anonymous peer just to establish connectivity for the welcome screen
-  myPeer = new Peer();
+  myPeer = new Peer(ICE_CFG);
   myPeer.on('open', () => setConnBadge(true));
   myPeer.on('error', e => {
     if(e.type==='unavailable-id'||e.type==='peer-unavailable')return; // expected
@@ -225,7 +239,7 @@ function setConnBadge(ok, msg){
 // HOST: CREATE GAME
 // ============================================================
 function createGame(){
-  const n=+$('pc').value, cap=Math.max(2,Math.ceil(n/3));
+  const n=+$('pc').value, cap=n<=5?1:Math.max(2,Math.ceil(n/3));
   const code=genCode();
   const up=new Set(), ub=new Set();
   H={
@@ -245,7 +259,7 @@ function createGame(){
   if(myPeer&&!myPeer.destroyed)myPeer.destroy();
 
   // Create peer with game code as ID
-  myPeer=new Peer('bunkr-'+code);
+  myPeer=new Peer('bunkr-'+code, ICE_CFG);
 
   myPeer.on('open', ()=>{
     renderHostLobby();
@@ -492,7 +506,7 @@ function joinGame(){
 
   // Always create a fresh peer so error handlers are clean
   if(myPeer&&!myPeer.destroyed) myPeer.destroy();
-  myPeer=new Peer();
+  myPeer=new Peer(ICE_CFG);
 
   myPeer.on('error', err=>{
     if(err.type==='peer-unavailable'){
