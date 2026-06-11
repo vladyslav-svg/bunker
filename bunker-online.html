@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BUNKER Online</title>
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg:#fff;--bg2:#f5f5f4;--fg:#1c1c1b;--fg2:#6b6b68;--fg3:#9b9b98;--b:rgba(0,0,0,0.12);--b2:rgba(0,0,0,0.22);--acc:#185fa5;--acc-bg:#e6f1fb;--dan:#a32d2d;--dan-bg:#fcebeb;--ok:#3b6d11;--ok-bg:#eaf3de;--r:12px;--rs:8px}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1b;--bg2:#2c2c2a;--fg:#f1efea;--fg2:#b4b2a9;--fg3:#888780;--b:rgba(255,255,255,0.12);--b2:rgba(255,255,255,0.22);--acc:#85b7eb;--acc-bg:#042c53;--dan:#f09595;--dan-bg:#501313;--ok:#97c459;--ok-bg:#173404}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--fg);max-width:500px;margin:0 auto}
+.scr{display:none;padding:1rem 1rem 4rem}
+.scr.on{display:block}
+h2{font-size:20px;font-weight:600}
+p{font-size:14px;color:var(--fg2);line-height:1.5}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 16px;font-size:15px;font-weight:500;font-family:inherit;border:1px solid var(--b2);border-radius:var(--rs);background:transparent;color:var(--fg);cursor:pointer;margin-top:10px}
+.btn:hover{background:var(--bg2)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:var(--acc-bg);color:var(--acc);border-color:var(--acc)}
+.btn-d{background:var(--dan-bg);color:var(--dan);border-color:var(--dan)}
+.btn-ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.btn-sm{padding:6px 12px;font-size:13px;width:auto;margin-top:0}
+.card{background:var(--bg);border:1px solid var(--b);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:10px}
+.trait{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--b);align-items:flex-start}
+.trait:first-child{padding-top:0}
+.trait:last-child{border-bottom:none;padding-bottom:0}
+.tl{font-size:11px;color:var(--fg2);min-width:72px;flex-shrink:0;padding-top:2px;text-transform:uppercase;letter-spacing:.3px}
+.tv{font-size:14px;font-weight:500;color:var(--fg);line-height:1.4}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.stat{background:var(--bg2);border-radius:var(--rs);padding:12px}
+.stat-n{font-size:26px;font-weight:600}
+.stat-l{font-size:12px;color:var(--fg2);margin-top:2px}
+.sh{font-size:11px;font-weight:600;color:var(--fg3);text-transform:uppercase;letter-spacing:.8px;margin:1.25rem 0 .5rem}
+.prow{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b)}
+.prow:last-child{border-bottom:none}
+.pn{font-size:15px;font-weight:500}
+.pn.out{color:var(--fg3);text-decoration:line-through}
+.ps{font-size:12px;color:var(--fg2);margin-top:2px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.b-ok{background:var(--ok-bg);color:var(--ok)}
+.b-d{background:var(--dan-bg);color:var(--dan)}
+.b-info{background:var(--acc-bg);color:var(--acc)}
+.b-warn{background:#faeeda;color:#854f0b}
+.ib{border:none;background:none;cursor:pointer;color:var(--fg2);padding:6px;font-size:20px;display:flex;align-items:center}
+.ib:hover{color:var(--fg)}
+input[type=text]{width:100%;padding:12px 14px;font-size:16px;font-family:inherit;border:1px solid var(--b2);border-radius:var(--rs);background:var(--bg);color:var(--fg);outline:none;margin-top:6px}
+input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+.code-big{font-size:52px;font-weight:700;letter-spacing:10px;text-align:center;font-family:monospace;color:var(--acc);padding:.75rem 0}
+.code-inp{font-size:32px!important;font-weight:700!important;text-align:center!important;letter-spacing:8px!important;text-transform:uppercase!important;padding:16px 14px!important}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+</style>
+</head>
+<body>
+
+<!-- WELCOME -->
+<div id="s-welcome" class="scr on">
+  <div style="text-align:center;padding:2.5rem 0 1.75rem">
+    <i class="ti ti-building-fortress" style="font-size:52px;color:var(--fg2)"></i>
+    <div style="font-size:28px;font-weight:600;letter-spacing:3px;margin-top:.75rem">BUNKER</div>
+    <p style="margin-top:.25rem">Each player joins from their own phone</p>
+    <div id="conn-badge" style="display:inline-flex;align-items:center;gap:5px;margin-top:.75rem;background:var(--bg2);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--fg3)">
+      <i class="ti ti-loader-2" style="font-size:13px;animation:spin 1s linear infinite"></i> Connecting…
+    </div>
+  </div>
+  <button class="btn btn-p" id="btn-host" onclick="go('s-host-config')" disabled><i class="ti ti-crown"></i> Host a game</button>
+  <button class="btn" id="rejoin-btn" style="display:none" onclick="tryRejoin()"><i class="ti ti-refresh"></i> Rejoin last game</button>
+  <button class="btn" id="btn-join" onclick="go('s-join')" disabled><i class="ti ti-login"></i> Join a game</button>
+  <p style="text-align:center;margin-top:1.25rem;font-size:12px;color:var(--fg3)">Peer-to-peer via WebRTC · host phone is the server</p>
+</div>
+
+<!-- HOST CONFIG -->
+<div id="s-host-config" class="scr">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem">
+    <button class="ib" onclick="go('s-welcome')"><i class="ti ti-arrow-left"></i></button>
+    <h2 style="margin:0">Host a game</h2>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <label style="font-size:14px;color:var(--fg2)">Number of players</label>
+      <span id="pc-v" style="font-size:22px;font-weight:600">8</span>
+    </div>
+    <input type="range" id="pc" min="2" max="20" value="8" step="1" style="width:100%"
+      oninput="$('pc-v').textContent=this.value;$('cap-prev').textContent=Math.max(2,Math.ceil(+this.value/3))">
+    <div style="display:flex;justify-content:space-between;margin-top:8px">
+      <span style="font-size:11px;color:var(--fg3)">2</span>
+      <span style="font-size:12px;color:var(--fg2)">Bunker fits <span id="cap-prev">3</span></span>
+      <span style="font-size:11px;color:var(--fg3)">20</span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;color:var(--fg2);font-weight:500">Your name <span style="font-weight:400;font-size:12px;color:var(--fg3)">(you play too)</span></div>
+    <input type="text" id="host-name-inp" placeholder="Host" maxlength="20" autocomplete="off">
+  </div>
+  <div class="card">
+    <div style="font-size:14px;color:var(--fg2);font-weight:500">App URL <span style="font-weight:400;font-size:12px;color:var(--fg3)">(optional — makes QR scannable)</span></div>
+    <input type="text" id="app-url-input" placeholder="https://yourapp.netlify.app"
+      oninput="localStorage.setItem('bunker-url',this.value)">
+    <p style="font-size:12px;margin-top:6px">Players scan QR → app opens with code pre-filled. Leave blank to share code verbally.</p>
+  </div>
+  <button class="btn btn-p" onclick="createGame()"><i class="ti ti-rocket"></i> Create game &amp; get code</button>
+</div>
+
+<!-- HOST LOBBY -->
+<div id="s-host-lobby" class="scr"></div>
+
+<!-- HOST GAME -->
+<div id="s-host-game" class="scr"></div>
+
+<!-- HOST VIEW CARD -->
+<div id="s-host-card" class="scr"></div>
+
+<!-- HOST SCENARIO -->
+<div id="s-host-scenario" class="scr"></div>
+
+<!-- JOIN -->
+<div id="s-join" class="scr">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem">
+    <button class="ib" onclick="go('s-welcome')"><i class="ti ti-arrow-left"></i></button>
+    <h2 style="margin:0">Join a game</h2>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;color:var(--fg2);font-weight:500">Your name</div>
+    <input type="text" id="name-inp" placeholder="Enter your name" maxlength="20" autocomplete="off">
+    <div style="font-size:14px;color:var(--fg2);font-weight:500;margin-top:14px">Game code</div>
+    <input type="text" id="code-inp" class="code-inp" placeholder="ABCD" maxlength="4"
+      autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+      oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase()">
+  </div>
+  <button class="btn btn-p" id="btn-do-join" onclick="joinGame()"><i class="ti ti-login"></i> Join</button>
+  <div id="join-err" style="color:var(--dan);font-size:13px;text-align:center;margin-top:8px;min-height:18px"></div>
+</div>
+
+<!-- PLAYER LOBBY -->
+<div id="s-player-lobby" class="scr"></div>
+
+<!-- PLAYER GAME -->
+<div id="s-player-game" class="scr"></div>
+
+<!-- ELIMINATED -->
+<div id="s-elim" class="scr" style="min-height:80vh;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:var(--dan-bg)">
+  <i class="ti ti-skull" style="font-size:72px;color:var(--dan)"></i>
+  <div style="font-size:26px;font-weight:600;margin-top:1rem;color:var(--fg)">You've been eliminated</div>
+  <p style="margin-top:.5rem">The bunker door closes. You stay outside.</p>
+  <button class="btn" onclick="$('s-elim').style.display='none';$('s-elim').classList.remove('on');go('s-player-game')" style="max-width:240px;margin-top:2rem">
+    <i class="ti ti-eye"></i> View my card
+  </button>
+</div>
+
+<script>
+// ============================================================
+// GAME DATA
+// ============================================================
+const CATS=[{name:"Asteroid Impact",icon:"ti-planet",col:"#d85a30",desc:"A 5km asteroid hits Earth. Nuclear winter has begun. 90% of surface uninhabitable.",dur:"20–50 years",type:"Deep underground facility"},{name:"Nuclear War",icon:"ti-radioactive",col:"#d85a30",desc:"18 nations exchanged warheads. Fallout covers the northern hemisphere. Surface radiation is lethal.",dur:"10–30 years",type:"Reinforced concrete shelter"},{name:"Supervirus Pandemic",icon:"ti-virus",col:"#3b6d11",desc:"Genetically engineered pathogen — 99% fatality rate, airborne, no known cure.",dur:"5–15 years",type:"Airtight biohazard bunker"},{name:"Supervolcano Eruption",icon:"ti-flame",col:"#854f0b",desc:"Yellowstone erupts. Ash cloud blocks global sunlight. Agriculture has collapsed completely.",dur:"15–25 years",type:"Underground agricultural facility"},{name:"AI Takeover",icon:"ti-robot",col:"#534ab7",desc:"A rogue superintelligence is exterminating uncontrolled humans. The bunker is fully off-grid.",dur:"Unknown",type:"Faraday-cage underground shelter"},{name:"Zombie Outbreak",icon:"ti-skull",col:"#3b6d11",desc:"Unknown pathogen reanimates the dead. 3 billion infected roam the surface.",dur:"10–20 years",type:"Fortified underground compound"},{name:"Solar Flare EMP",icon:"ti-sun",col:"#854f0b",desc:"Massive CME destroys all electronics globally. Modern civilization collapses instantly.",dur:"5–10 years",type:"Analog-tech equipped bunker"},{name:"Climate Collapse",icon:"ti-temperature-sun",col:"#d85a30",desc:"Runaway greenhouse. Surface temperature 65°C. All crops worldwide are dead.",dur:"30–100 years",type:"Climate-controlled deep shelter"},{name:"Alien Invasion",icon:"ti-ufo",col:"#534ab7",desc:"Extraterrestrials demand total surrender. 80% of cities destroyed.",dur:"Unknown",type:"Cloaked underground bunker"},{name:"Fungal Apocalypse",icon:"ti-mushroom",col:"#3b6d11",desc:"Mutant Cordyceps strain converts humans into fungal drone organisms.",dur:"15–30 years",type:"Sterile negative-pressure bunker"},{name:"Oxygen Depletion",icon:"ti-wind",col:"#185fa5",desc:"Phytoplankton collapse. Atmospheric O₂ dropping 1%/year. Surface unbreathable in 5 years.",dur:"10–20 years",type:"Sealed oxygen-recycling vault"},{name:"Rogue Planet",icon:"ti-planet-off",col:"#993556",desc:"A dark rogue planet passes close. Mega-earthquakes and tsunamis worldwide.",dur:"3–7 years",type:"Inland mountain bunker"}];
+const FEATS=[["Hydroponic greenhouse","Full surgical bay","Weapons vault","10-year food supply"],["Library 50k books","Chemistry lab","Solar+nuclear power","Genetics lab"],["Animal breeding pens","Water purification plant","Armory","Metalworking shop"],["Cryogenic chambers","Seed bank 50k species","Medical bay","Brewery"],["3D printing facility","Long-range comms","Radiation shields","Mushroom farm"]];
+const PROFS=["Surgeon","Nuclear Physicist","Permaculture Farmer","Special Forces Soldier","Plumber","Trauma Psychologist","Executive Chef","Electrical Engineer","Biology Teacher","Microbiologist","Software Developer","Orthodox Priest","Ex-Convict (armed robbery)","Retired Astronaut","ER Nurse","Structural Architect","Diesel Mechanic","Criminal Lawyer","Corrupt Politician","Opera Singer","Janitor","Drug Dealer","Gynecologist","Mortician","Sex Worker","Circus Clown","Crypto Influencer","Conspiracy Theorist","Arms Dealer","Demolitions Expert","Toxicologist","Retired Spy","Doomsday Prepper","Epidemiologist","Nuclear Plant Operator","Traditional Shaman","Veterinarian","Marine Biologist","Wildfire Firefighter","Black Market Pharmacist"];
+const AGES=["8-year-old boy","8-year-old girl","16-year-old boy","16-year-old girl","24-year-old man","24-year-old woman","31-year-old man","31-year-old woman","38-year-old man","38-year-old woman","45-year-old man","45-year-old woman","53-year-old man","53-year-old woman","62-year-old man","62-year-old woman","70-year-old man","70-year-old woman","Pregnant woman (7 months)","Newborn baby (3 months)"];
+const HEALTH=["Perfectly healthy — above average fitness","Color blind (red-green)","Severe gluten allergy (anaphylactic risk)","Chronic clinical depression (medicated)","Missing left arm (functional prosthetic)","HIV positive (controlled, on medication)","Type 1 diabetic — insulin dependent","Blind in right eye","Severe asthma — needs inhaler twice daily","Morbidly obese (148 kg)","Antisocial personality disorder","Right leg amputated (uses crutches)","Severe claustrophobia — ironically","Epilepsy (3–4 seizures/month, uncontrolled)","Anorexia nervosa — dangerously underweight","Paranoid schizophrenia (medicated)","Night blind — cannot see in dim light","Superhuman immune system (never gets sick)","Hyper-accelerated healing (10× faster)","Profoundly deaf (reads lips fluently)","Narcolepsy — falls asleep without warning","Eidetic memory — forgets absolutely nothing","Severe OCD (rituals take 2 hours/day)","Chronic severe back pain (barely functional)","Missing all teeth (functional dentures)"];
+const HOBBIES=["Wilderness survival training","Competitive knitting","Amateur taxidermy","Gourmet cooking","Mixed martial arts","Beekeeping","Black market trading","Rock climbing","Meditation & yoga","Attack dog training","Amateur chemistry","Lock picking","Moonshine brewing","Virus research (hobby)","Wild foraging","Trauma first aid & field surgery","Ham radio operation","Gunsmithing","Hydroponics gardening","Cave diving","Animal husbandry","Herbal medicine","Doomsday prepping","Blacksmithing","Human psychology experiments"];
+const LUGG=["250 seed varieties (vacuum-sealed)","Complete field surgery kit","AK-47 + 500 rounds","Illustrated Bible (annotated)","Solar laptop (offline Wikipedia)","Nuclear physics textbooks","Professional multi-tool","10-year antibiotic supply","Portable water filter (50L/hr)","100m military paracord","10kg uncut cocaine (trade value)","Live cat in carrier","50kg gold coins (pre-1900)","Childhood stuffed animal","Anarchist Cookbook (annotated)","2,000 condoms","Satellite phone (3-year plan)","Framed oil self-portrait","Encyclopedia set (20 vols)","Military crossbow + 200 bolts","1-year vitamin supply","Night vision goggles (military)","Portable chemistry lab","Hand-cranked generator","Complete Shakespeare (annotated)","500 cannabis seeds","Medical morphine supply","Surveillance drone + 5 batteries","500 heirloom seeds","Permanent fire-starting kit"];
+const PHOBIAS=["Nyctophobia — fear of darkness","Claustrophobia — fear of confined spaces (ironic)","Arachnophobia — fear of spiders","Hemophobia — faints at sight of blood","Thanatophobia — obsessive fear of death","Anthropophobia — fear of other people","Haphephobia — cannot tolerate being touched","Mysophobia — fear of germs","Pyrophobia — extreme fear of fire","Hydrophobia — fear of water","Phonophobia — fear of loud noises","Murophobia — fear of rats & mice","Acrophobia — fear of heights","Trypanophobia — faints at needles","Monophobia — cannot be alone even briefly","Eisoptrophobia — fear of mirrors","No known phobias whatsoever (suspicious)","Radiophobia — fear of radiation","Atychiphobia — crippling fear of failure","Mageirocophobia — fear of cooking food","Arithmophobia — panic attacks around numbers","Dystychiphobia — fear of accidents"];
+const BIOS=["Fluent in 5 languages including Mandarin & Russian","Former Olympic bronze medalist (precision shooting)","Has memorized the complete human genome sequencing protocol","Knows how to manufacture meth from scratch","Has dual citizenship (USA & remote NZ island)","Is secretly terminally ill — 6 months without medication","Survived 40 days alone in the Siberian wilderness","Photographic memory — forgets absolutely nothing","Former doomsday cult member (left 2 years ago)","Carries classified government documents (contents unknown)","Survived two previous near-extinction events","Trained government assassin (officially non-existent)","Once performed emergency surgery on themselves","Has a hidden personal food cache stashed nearby","World's last expert in critical agricultural knowledge","Fully functional on 3 hours sleep indefinitely","Blood type O- with rare immune mutation","Master psychological manipulator — zero moral restraints","Secretly runs underground charity — everyone outside loves them","Knows a secret about another player that would destroy morale","Can brew alcohol from virtually any organic material","Was officially declared legally dead — spontaneous resuscitation","Can disassemble any firearm blindfolded in 90 seconds","Savant-level mathematics ability","Was pharma test subject — unknown long-term effects"];
+
+// ============================================================
+// HELPERS
+// ============================================================
+const $=id=>document.getElementById(id);
+function go(id){
+  document.querySelectorAll('.scr').forEach(s=>{s.classList.remove('on');s.style.display='';});
+  const el=$(id);el.classList.add('on');window.scrollTo(0,0);
+}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function pickU(a,u){const av=a.filter(x=>!u.has(x));const src=av.length?av:a;const v=src[Math.floor(Math.random()*src.length)];u.add(v);return v}
+function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:4},()=>c[Math.floor(Math.random()*c.length)]).join('')}
+function makeQR(text){try{const q=qrcode(0,'M');q.addData(text);q.make();return q.createSvgTag(4,0)}catch(e){try{const q=qrcode(3,'L');q.addData(text);q.make();return q.createSvgTag(4,0)}catch(e2){return''}}}
+
+// ============================================================
+// PEERJS — host peer registers with game code as ID.
+// Players connect directly to the host (P2P via WebRTC).
+// Card data is sent directly host→player — no shared database.
+// ============================================================
+
+// Shared PeerJS instance (reused for both host and player roles)
+let myPeer = null;
+
+// HOST state
+let hostConns = {};  // uid → DataConnection
+let H = {};          // host game state
+
+// PLAYER state
+let hostConn = null;
+let P = {};          // player game state
+
+// ── Connection readiness ─────────────────────────────────────
+function initPeer(){
+  // Create an anonymous peer just to establish connectivity for the welcome screen
+  myPeer = new Peer();
+  myPeer.on('open', () => setConnBadge(true));
+  myPeer.on('error', e => {
+    if(e.type==='unavailable-id'||e.type==='peer-unavailable')return; // expected
+    setConnBadge(false,'Error: '+e.type);
+  });
+  myPeer.on('disconnected', ()=>setConnBadge(false,'Disconnected'));
+}
+
+function setConnBadge(ok, msg){
+  const b=$('conn-badge');
+  if(!b)return;
+  b.innerHTML=ok
+    ?'<i class="ti ti-circle-check" style="font-size:14px;color:var(--ok)"></i> <span style="color:var(--ok)">Ready</span>'
+    :`<i class="ti ti-wifi-off" style="font-size:14px;color:var(--dan)"></i> <span style="color:var(--dan)">${msg||'Offline — check internet'}</span>`;
+  $('btn-host').disabled=!ok;
+  $('btn-join').disabled=!ok;
+}
+
+// ============================================================
+// HOST: CREATE GAME
+// ============================================================
+function createGame(){
+  const n=+$('pc').value, cap=Math.max(2,Math.ceil(n/3));
+  const code=genCode();
+  const up=new Set(), ub=new Set();
+  H={
+    code, n, cap,
+    cat:pick(CATS), feats:pick(FEATS),
+    cards:Array.from({length:n},()=>({
+      profession:pickU(PROFS,up),age:pick(AGES),health:pick(HEALTH),
+      hobby:pick(HOBBIES),luggage:pick(LUGG),phobia:pick(PHOBIAS),biofact:pickU(BIOS,ub)
+    })),
+    hostName:($('host-name-inp').value.trim()||'Host'),
+    players:{},  // uid → {name, joinedAt, cardIdx, eliminated}
+    round:1, phase:'lobby', confirming:null
+  };
+  hostConns={};
+
+  // Destroy old peer if any
+  if(myPeer&&!myPeer.destroyed)myPeer.destroy();
+
+  // Create peer with game code as ID
+  myPeer=new Peer('bunkr-'+code);
+
+  myPeer.on('open', ()=>{
+    renderHostLobby();
+    go('s-host-lobby');
+  });
+
+  myPeer.on('error', err=>{
+    if(err.type==='unavailable-id'){
+      // Code taken — retry with new code
+      createGame();
+    } else {
+      alert('Connection error: '+err.type+'. Check internet and try again.');
+    }
+  });
+
+  // Incoming player connections
+  myPeer.on('connection', conn=>{
+    const uid=conn.peer;
+    conn.on('open',()=>{
+      conn.on('data', msg=>onHostReceive(uid, conn, msg));
+    });
+    conn.on('close',()=>{
+      if(H.players[uid])H.players[uid].disconnected=true;
+      if(H.phase==='lobby')renderHostLobby();
+      else renderHostGame();
+    });
+    conn.on('error',()=>{
+      if(H.players[uid])H.players[uid].disconnected=true;
+    });
+  });
+}
+
+// Host receives a message from a player
+function onHostReceive(uid, conn, msg){
+  if(msg.type==='join'){
+    const idx=Object.keys(H.players).length;
+    H.players[uid]={name:msg.name, joinedAt:Date.now(), cardIdx:-1, eliminated:false, disconnected:false};
+    hostConns[uid]=conn;
+    // Acknowledge
+    conn.send({type:'ack', playerCount:Object.keys(H.players).length});
+    renderHostLobby();
+  }
+}
+
+// ── HOST: LOBBY ──────────────────────────────────────────────
+function renderHostLobby(){
+  const joined=Object.values(H.players).filter(p=>p&&p.joinedAt).sort((a,b)=>a.joinedAt-b.joinedAt);
+  const appUrl=localStorage.getItem('bunker-url')||'';
+  const qrText=appUrl?`${appUrl}?code=${H.code}`:`BUNKER CODE: ${H.code}`;
+  const qrSvg=makeQR(qrText);
+
+  $('s-host-lobby').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+      <h2 style="margin:0">Waiting for players</h2>
+      <span class="badge b-info">${joined.length}/${H.n}</span>
+    </div>
+    <div class="card" style="text-align:center;padding:1.25rem">
+      <div style="font-size:12px;color:var(--fg2);margin-bottom:4px">Share this code</div>
+      <div class="code-big">${H.code}</div>
+      ${qrSvg?`<div style="display:flex;justify-content:center;margin:.75rem 0">${qrSvg}</div>`:''}
+      <p style="font-size:12px;color:var(--fg3)">${appUrl?'Scan QR or type code in Bunker app':'Open Bunker app → Join a game → type code'}</p>
+    </div>
+    <div class="sh">Players joined</div>
+    <div class="card" style="padding:.5rem .75rem;min-height:52px">
+      ${joined.length===0
+        ?`<p style="text-align:center;padding:.75rem 0;font-size:13px;animation:pulse 1.5s ease-in-out infinite">Waiting for players to join…</p>`
+        :joined.map((p,i)=>`<div class="prow">
+            <span class="pn">${i+1}. ${p.name}</span>
+            <span class="badge ${p.disconnected?'b-warn':'b-ok'}">${p.disconnected?'Dropped':'Ready'}</span>
+          </div>`).join('')}
+    </div>
+    <button class="btn btn-p" onclick="hostStartGame()">
+      <i class="ti ti-building-fortress"></i> Start game (${joined.length+1} player${joined.length+1!==1?'s':''})
+    </button>
+    <p style="text-align:center;font-size:12px;color:var(--fg3);margin-top:.75rem">You + ${joined.length} joined. Everyone must be in before you start.</p>`;
+}
+
+// ── HOST: START GAME ─────────────────────────────────────────
+function hostStartGame(){
+  // Register host as a player (joinedAt:0 so they appear first)
+  H.players['__host__']={name:H.hostName, joinedAt:0, cardIdx:-1, eliminated:false, disconnected:false};
+
+  const sorted=Object.entries(H.players)
+    .filter(([,p])=>p&&p.joinedAt!==undefined&&!p.disconnected)
+    .sort(([,a],[,b])=>a.joinedAt-b.joinedAt);
+
+  sorted.forEach(([uid],idx)=>{
+    H.players[uid].cardIdx=idx;
+    const conn=hostConns[uid];
+    if(conn&&conn.open){
+      conn.send({
+        type:'game-start',
+        card: H.cards[idx],
+        meta:{ cap:H.cap, n:H.n, cat:H.cat, feats:H.feats }
+      });
+    }
+  });
+
+  H.phase='playing';
+  renderHostGame();
+  go('s-host-game');
+}
+
+// ── HOST: GAME BOARD ─────────────────────────────────────────
+function renderHostGame(){
+  const all=Object.entries(H.players)
+    .filter(([,p])=>p&&p.joinedAt)
+    .sort(([,a],[,b])=>(a.cardIdx??99)-(b.cardIdx??99));
+  const alive=all.filter(([,p])=>!p.eliminated);
+  const toGo=alive.length-H.cap, done=toGo<=0;
+
+  $('s-host-game').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h2 style="margin:0">Game Board</h2>
+      <div style="font-size:13px;color:var(--fg2)">Round ${H.round}</div>
+    </div>
+    <div class="stats" style="margin-top:0">
+      <div class="stat"><div class="stat-n">${alive.length}</div><div class="stat-l">Alive</div></div>
+      <div class="stat"><div class="stat-n" style="color:${done?'var(--ok)':'var(--dan)'}">${Math.max(0,toGo)}</div><div class="stat-l">${done?'Bunker ready!':'To eliminate'}</div></div>
+    </div>
+    ${done?`<div style="background:var(--ok-bg);border:1px solid var(--ok);border-radius:var(--rs);padding:1rem;margin-bottom:1rem;text-align:center">
+      <i class="ti ti-trophy" style="font-size:22px;color:var(--ok)"></i>
+      <div style="font-weight:600;color:var(--ok);margin-top:4px">Survivors selected!</div>
+    </div>`:''}
+    <div class="sh">Players — <i class="ti ti-id" style="font-size:11px"></i> view card</div>
+    <div class="card" style="padding:.5rem .75rem">
+      ${all.map(([uid,p])=>{
+        const card=(p.cardIdx>=0)?H.cards[p.cardIdx]:null;
+        const isHost=uid==='__host__';
+        return`<div class="prow">
+          <div>
+            <div class="pn ${p.eliminated?'out':''}">${p.name}${isHost?'<span style="font-size:11px;color:var(--acc);margin-left:5px">you</span>':''}${p.disconnected?'<span style="font-size:11px;color:var(--fg3);margin-left:4px">(offline)</span>':''}</div>
+            <div class="ps ${p.eliminated?'out':''}">${card?card.profession:'—'}</div>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${p.eliminated?`<span class="badge b-d">Out</span>`:
+              isHost
+                ?`<button class="btn btn-p btn-sm" onclick="viewCard('__host__')"><i class="ti ti-id"></i> My card</button>`
+                :H.confirming===uid
+                  ?`<button class="btn btn-d btn-sm" onclick="doElim('${uid}')">Confirm</button>
+                    <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
+                  :`${card?`<button class="ib" onclick="viewCard('${uid}')"><i class="ti ti-id"></i></button>`:''}
+                    <button class="btn btn-sm" onclick="H.confirming='${uid}';renderHostGame()" style="color:var(--dan);border-color:var(--dan)">Kick out</button>`}
+          </div>
+        </div>`}).join('')}
+    </div>
+    <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> View scenario</button>`;
+}
+
+function doElim(uid){
+  H.players[uid].eliminated=true;
+  H.round++;
+  H.confirming=null;
+  // Notify the eliminated player
+  const conn=hostConns[uid];
+  if(conn&&conn.open) conn.send({type:'eliminated'});
+  // Broadcast round update to all alive players
+  broadcast({type:'round-update', round:H.round,
+    aliveCount:Object.values(H.players).filter(p=>!p.eliminated&&p.joinedAt).length});
+  renderHostGame();
+}
+
+function broadcast(msg){
+  Object.entries(hostConns).forEach(([uid,conn])=>{
+    if(!H.players[uid]?.eliminated&&conn.open) conn.send(msg);
+  });
+}
+
+function viewCard(uid){
+  const p=H.players[uid];
+  const card=(p&&p.cardIdx>=0)?H.cards[p.cardIdx]:null;
+  if(!card)return;
+  $('s-host-card').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="ib" onclick="renderHostGame();go('s-host-game')"><i class="ti ti-arrow-left"></i></button>
+        <h2 style="margin:0">${p.name}</h2>
+      </div>
+      <span class="badge ${p.eliminated?'b-d':'b-ok'}">${p.eliminated?'Eliminated':'Alive'}</span>
+    </div>
+    <div class="card">${cardHTML(card)}</div>
+    <button class="btn" onclick="renderHostGame();go('s-host-game')"><i class="ti ti-arrow-left"></i> Back to game</button>`;
+  go('s-host-card');
+}
+
+function renderScenario(){
+  const m=H;
+  $('s-host-scenario').innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+      <button class="ib" onclick="go(H.phase==='playing'?'s-host-game':'s-host-lobby')"><i class="ti ti-arrow-left"></i></button>
+      <h2 style="margin:0">Scenario</h2>
+    </div>
+    <div style="text-align:center;padding:1rem 0 .75rem">
+      <i class="ti ${m.cat.icon}" style="font-size:44px;color:${m.cat.col}"></i>
+      <div style="font-size:22px;font-weight:600;margin-top:.4rem">${m.cat.name}</div>
+      <p style="margin-top:.35rem">${m.cat.desc}</p>
+    </div>
+    <div class="card">
+      <div class="sh" style="margin-top:0">The Bunker</div>
+      <div class="trait"><span class="tl">Type</span><span class="tv">${m.cat.type}</span></div>
+      <div class="trait"><span class="tl">Duration</span><span class="tv">${m.cat.dur}</span></div>
+      <div class="trait"><span class="tl">Capacity</span><span class="tv" style="color:${m.cat.col};font-weight:600">${m.cap} of ${m.n} survive</span></div>
+      <div class="trait"><span class="tl">Features</span><span class="tv">${m.feats.join(' · ')}</span></div>
+    </div>`;
+}
+
+// ============================================================
+// PLAYER: JOIN
+// ============================================================
+function joinGame(){
+  const code=$('code-inp').value.trim().toUpperCase();
+  const name=($('name-inp').value.trim()||'Player').substring(0,20);
+  $('join-err').textContent='';
+  if(code.length!==4){$('join-err').textContent='Enter a 4-letter game code';return}
+
+  P={code,name,phase:'lobby',card:null,meta:null,round:1,aliveCount:0,totalCount:0,eliminated:false};
+  localStorage.setItem('bunker-last',JSON.stringify({code,name}));
+
+  // Reuse existing peer or create new anonymous one
+  if(myPeer&&!myPeer.destroyed&&myPeer.id){
+    connectToHost(code, name);
+  } else {
+    if(myPeer&&!myPeer.destroyed)myPeer.destroy();
+    myPeer=new Peer();
+    myPeer.on('open',()=>connectToHost(code,name));
+    myPeer.on('error',err=>showJoinErr(err.type));
+  }
+
+  $('btn-do-join').disabled=true;
+  $('btn-do-join').innerHTML='<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Connecting…';
+  renderPlayerLobby('connecting');
+  go('s-player-lobby');
+}
+
+function connectToHost(code, name){
+  hostConn=myPeer.connect('bunkr-'+code, {reliable:true});
+
+  hostConn.on('open',()=>{
+    hostConn.send({type:'join', name});
+    renderPlayerLobby('waiting');
+    resetJoinBtn();
+  });
+
+  hostConn.on('data', msg=>onPlayerReceive(msg));
+
+  hostConn.on('close',()=>{
+    if(P.phase==='lobby'){
+      showJoinErr('Host not found or disconnected.');
+    } else {
+      $('join-err').textContent='';
+      renderPlayerGame('Host disconnected — game paused.');
+    }
+    resetJoinBtn();
+  });
+
+  hostConn.on('error', err=>{
+    showJoinErr('Could not connect: '+err.type);
+    resetJoinBtn();
+  });
+
+  // Timeout if no response in 8 seconds
+  setTimeout(()=>{
+    if(P.phase==='lobby'&&(!hostConn||!hostConn.open)){
+      showJoinErr('Game not found. Check the code.');
+      resetJoinBtn();
+      go('s-join');
+    }
+  },8000);
+}
+
+function resetJoinBtn(){
+  const b=$('btn-do-join');
+  if(b){b.disabled=false;b.innerHTML='<i class="ti ti-login"></i> Join';}
+}
+function showJoinErr(msg){
+  $('join-err').textContent=msg;
+  go('s-join');
+}
+
+// Player receives a message from host
+function onPlayerReceive(msg){
+  if(msg.type==='ack'){
+    P.phase='lobby';
+    renderPlayerLobby('waiting');
+  } else if(msg.type==='game-start'){
+    P.phase='playing';
+    P.card=msg.card;
+    P.meta=msg.meta;
+    P.aliveCount=msg.meta.n;
+    P.totalCount=msg.meta.n;
+    renderPlayerGame();
+    go('s-player-game');
+  } else if(msg.type==='eliminated'){
+    P.eliminated=true;
+    renderPlayerGame();
+    const el=$('s-elim');
+    el.classList.add('on');el.style.display='flex';
+  } else if(msg.type==='round-update'){
+    P.round=msg.round;
+    P.aliveCount=msg.aliveCount;
+    renderPlayerGame();
+  }
+}
+
+// ── PLAYER: LOBBY ─────────────────────────────────────────────
+function renderPlayerLobby(state){
+  $('s-player-lobby').innerHTML=`
+    <div style="text-align:center;padding:2.5rem 0 1.5rem">
+      ${state==='connecting'
+        ?`<i class="ti ti-loader-2" style="font-size:44px;color:var(--fg3);animation:spin 1s linear infinite"></i>
+           <h2 style="margin-top:1rem">Connecting to host…</h2>`
+        :`<i class="ti ti-loader-2" style="font-size:44px;color:var(--fg3);animation:spin 1s linear infinite"></i>
+           <h2 style="margin-top:1rem">Waiting for host to start</h2>`}
+      <p style="margin-top:.5rem">Game code: <strong>${P.code}</strong></p>
+    </div>
+    <div class="card" style="text-align:center">
+      <p>You joined as <strong>${P.name}</strong></p>
+      <p style="font-size:12px;margin-top:.5rem;color:var(--fg3)">Keep this screen open while the host sets up</p>
+    </div>`;
+}
+
+// ── PLAYER: GAME SCREEN ───────────────────────────────────────
+function renderPlayerGame(notice){
+  $('s-player-game').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div>
+        <div style="font-size:16px;font-weight:600">${P.name}</div>
+        <div style="font-size:12px;color:var(--fg2)">Round ${P.round} · ${P.aliveCount}/${P.totalCount} alive${P.meta?` · Bunker holds ${P.meta.cap}`:''}</div>
+      </div>
+      <span class="badge ${P.eliminated?'b-d':'b-ok'}">${P.eliminated?'Eliminated':'Alive'}</span>
+    </div>
+    ${notice?`<div style="background:var(--acc-bg);border:0.5px solid var(--acc);border-radius:var(--rs);padding:.75rem 1rem;margin-bottom:10px;font-size:13px;color:var(--acc)">${notice}</div>`:''}
+    ${P.card
+      ?`<div class="card" ${P.eliminated?'style="opacity:.65"':''}>${cardHTML(P.card)}</div>`
+      :`<div class="card" style="text-align:center;padding:2rem">
+          <i class="ti ti-loader-2" style="font-size:28px;color:var(--fg3);animation:spin 1s linear infinite"></i>
+          <p style="margin-top:.75rem">Waiting for card assignment…</p>
+        </div>`}
+    ${P.meta?`<div class="card" style="padding:.75rem 1rem">
+      <div style="font-weight:500;font-size:14px">${P.meta.cat.name}</div>
+      <p style="margin-top:.25rem;font-size:13px">${P.meta.cat.desc}</p>
+      <p style="margin-top:.4rem;font-size:12px;color:var(--fg3)">Bunker: ${P.meta.cap} survivors · ${P.meta.cat.dur}</p>
+    </div>`:''}`;
+}
+
+// ============================================================
+// SHARED: CARD HTML
+// ============================================================
+function cardHTML(c){
+  return`<div class="sh" style="margin-top:0;margin-bottom:.2rem">Your character</div>
+    <div class="trait"><span class="tl">Profession</span><span class="tv">${c.profession}</span></div>
+    <div class="trait"><span class="tl">Age & sex</span><span class="tv">${c.age}</span></div>
+    <div class="trait"><span class="tl">Health</span><span class="tv">${c.health}</span></div>
+    <div class="trait"><span class="tl">Hobby</span><span class="tv">${c.hobby}</span></div>
+    <div class="trait"><span class="tl">Luggage</span><span class="tv">${c.luggage}</span></div>
+    <div class="trait"><span class="tl">Phobia</span><span class="tv">${c.phobia}</span></div>
+    <div class="trait"><span class="tl">Bio fact</span><span class="tv">${c.biofact}</span></div>`;
+}
+
+// ============================================================
+// REJOIN
+// ============================================================
+function tryRejoin(){
+  try{
+    const last=JSON.parse(localStorage.getItem('bunker-last')||'{}');
+    if(last.code){$('code-inp').value=last.code;$('name-inp').value=last.name||'';go('s-join')}
+  }catch(e){}
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load',()=>{
+  // Auto-fill code from URL ?code=XXXX
+  const code=new URLSearchParams(location.search).get('code');
+  if(code){$('code-inp').value=code.toUpperCase();go('s-join')}
+
+  // Load saved app URL
+  const savedUrl=localStorage.getItem('bunker-url');
+  if(savedUrl&&$('app-url-input'))$('app-url-input').value=savedUrl;
+
+  // Init previews
+  $('cap-prev').textContent=Math.max(2,Math.ceil(+$('pc').value/3));
+
+  // Show rejoin button
+  try{if(JSON.parse(localStorage.getItem('bunker-last')||'{}').code)$('rejoin-btn').style.display='flex'}catch(e){}
+
+  // Init connectivity
+  initPeer();
+});
+</script>
+</body>
+</html>
