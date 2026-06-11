@@ -94,10 +94,6 @@ input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,1
     </div>
   </div>
   <div class="card">
-    <div style="font-size:14px;color:var(--fg2);font-weight:500">Your name <span style="font-weight:400;font-size:12px;color:var(--fg3)">(you play too)</span></div>
-    <input type="text" id="host-name-inp" placeholder="Host" maxlength="20" autocomplete="off">
-  </div>
-  <div class="card">
     <div style="font-size:14px;color:var(--fg2);font-weight:500">App URL <span style="font-weight:400;font-size:12px;color:var(--fg3)">(optional — makes QR scannable)</span></div>
     <input type="text" id="app-url-input" placeholder="https://yourapp.netlify.app"
       oninput="localStorage.setItem('bunker-url',this.value)">
@@ -114,9 +110,6 @@ input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(24,95,1
 
 <!-- HOST VIEW CARD -->
 <div id="s-host-card" class="scr"></div>
-
-<!-- HOST MY CARD (shown right after game starts) -->
-<div id="s-host-mycard" class="scr"></div>
 
 <!-- HOST SCENARIO -->
 <div id="s-host-scenario" class="scr"></div>
@@ -249,7 +242,6 @@ function createGame(){
       profession:pickU(PROFS,up),age:pick(AGES),health:pick(HEALTH),
       hobby:pick(HOBBIES),luggage:pick(LUGG),phobia:pick(PHOBIAS),biofact:pickU(BIOS,ub)
     })),
-    hostName:($('host-name-inp').value.trim()||'Host'),
     players:{},  // uid → {name, joinedAt, cardIdx, eliminated}
     round:1, phase:'lobby', confirming:null
   };
@@ -331,19 +323,16 @@ function renderHostLobby(){
             <span class="badge ${p.disconnected?'b-warn':'b-ok'}">${p.disconnected?'Dropped':'Ready'}</span>
           </div>`).join('')}
     </div>
-    <button class="btn btn-p" onclick="hostStartGame()">
-      <i class="ti ti-building-fortress"></i> Start game (${joined.length+1} player${joined.length+1!==1?'s':''})
+    <button class="btn btn-p" onclick="hostStartGame()" ${joined.length===0?'disabled':''}>
+      <i class="ti ti-building-fortress"></i> Start game (${joined.length} player${joined.length!==1?'s':''})
     </button>
-    <p style="text-align:center;font-size:12px;color:var(--fg3);margin-top:.75rem">You + ${joined.length} joined. Everyone must be in before you start.</p>`;
+    <p style="text-align:center;font-size:12px;color:var(--fg3);margin-top:.75rem">Everyone must join before you start — late joiners won't get a card.</p>`;
 }
 
 // ── HOST: START GAME ─────────────────────────────────────────
 function hostStartGame(){
-  // Register host as a player (joinedAt:0 so they appear first)
-  H.players['__host__']={name:H.hostName, joinedAt:0, cardIdx:-1, eliminated:false, disconnected:false};
-
   const sorted=Object.entries(H.players)
-    .filter(([,p])=>p&&p.joinedAt!==undefined&&!p.disconnected)
+    .filter(([,p])=>p&&p.joinedAt&&!p.disconnected)
     .sort(([,a],[,b])=>a.joinedAt-b.joinedAt);
 
   sorted.forEach(([uid],idx)=>{
@@ -359,33 +348,14 @@ function hostStartGame(){
   });
 
   H.phase='playing';
-  renderHostMyCard();
-  go('s-host-mycard');
-}
-
-// ── HOST: MY CARD (shown right after start) ──────────────────
-function renderHostMyCard(){
-  const p=H.players['__host__'];
-  const card=H.cards[p.cardIdx];
-  $('s-host-mycard').innerHTML=`
-    <div style="text-align:center;padding:1.5rem 0 1rem">
-      <i class="ti ti-building-fortress" style="font-size:40px;color:var(--fg3)"></i>
-      <h2 style="margin-top:.5rem">Your character</h2>
-      <p>Remember it well — you can check back anytime.</p>
-    </div>
-    <div class="card">${cardHTML(card)}</div>
-    <div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:var(--rs);padding:.75rem 1rem;font-size:13px;color:var(--acc);margin-bottom:10px">
-      <strong>${H.cat.name}:</strong> ${H.cat.desc} Bunker holds <strong>${H.cap}</strong> of ${Object.values(H.players).filter(p=>!p.disconnected).length} players.
-    </div>
-    <button class="btn btn-p" onclick="renderHostGame();go('s-host-game')">
-      <i class="ti ti-layout-dashboard"></i> Go to game board
-    </button>`;
+  renderHostGame();
+  go('s-host-game');
 }
 
 // ── HOST: GAME BOARD ─────────────────────────────────────────
 function renderHostGame(){
   const all=Object.entries(H.players)
-    .filter(([,p])=>p&&p.joinedAt!==undefined)
+    .filter(([,p])=>p&&p.joinedAt)
     .sort(([,a],[,b])=>(a.cardIdx??99)-(b.cardIdx??99));
   const alive=all.filter(([,p])=>!p.eliminated);
   const toGo=alive.length-H.cap, done=toGo<=0;
@@ -407,32 +377,22 @@ function renderHostGame(){
     <div class="card" style="padding:.5rem .75rem">
       ${all.map(([uid,p])=>{
         const card=(p.cardIdx>=0)?H.cards[p.cardIdx]:null;
-        const isHost=uid==='__host__';
         return`<div class="prow">
           <div>
-            <div class="pn ${p.eliminated?'out':''}">${p.name}${isHost?'<span style="font-size:11px;color:var(--acc);margin-left:5px">you</span>':''}${p.disconnected?'<span style="font-size:11px;color:var(--fg3);margin-left:4px">(offline)</span>':''}</div>
+            <div class="pn ${p.eliminated?'out':''}">${p.name}${p.disconnected?'<span style="font-size:11px;color:var(--fg3);margin-left:4px">(offline)</span>':''}</div>
             <div class="ps ${p.eliminated?'out':''}">${card?card.profession:'—'}</div>
           </div>
           <div style="display:flex;gap:5px;align-items:center">
             ${p.eliminated?`<span class="badge b-d">Out</span>`:
-              isHost
-                ?(H.confirming==='__host__'
-                  ?`<button class="btn btn-d btn-sm" onclick="doElim('__host__')">Confirm</button>
-                    <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
-                  :`<button class="btn btn-p btn-sm" onclick="viewCard('__host__')"><i class="ti ti-id"></i> My card</button>
-                    <button class="btn btn-sm" onclick="H.confirming='__host__';renderHostGame()" style="color:var(--dan);border-color:var(--dan)">Kick me</button>`)
-                :H.confirming===uid
-                  ?`<button class="btn btn-d btn-sm" onclick="doElim('${uid}')">Confirm</button>
-                    <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
-                  :`${card?`<button class="ib" onclick="viewCard('${uid}')"><i class="ti ti-id"></i></button>`:''}
-                    <button class="btn btn-sm" onclick="H.confirming='${uid}';renderHostGame()" style="color:var(--dan);border-color:var(--dan)">Kick out</button>`}
+              H.confirming===uid
+                ?`<button class="btn btn-d btn-sm" onclick="doElim('${uid}')">Confirm</button>
+                  <button class="btn btn-sm" onclick="H.confirming=null;renderHostGame()">Cancel</button>`
+                :`${card?`<button class="ib" onclick="viewCard('${uid}')"><i class="ti ti-id"></i></button>`:''}
+                  <button class="btn btn-sm" onclick="H.confirming='${uid}';renderHostGame()" style="color:var(--dan);border-color:var(--dan)">Kick out</button>`}
           </div>
         </div>`}).join('')}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-      <button class="btn btn-p" onclick="renderHostMyCard();go('s-host-mycard')"><i class="ti ti-id"></i> My card</button>
-      <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> Scenario</button>
-    </div>`;
+    <button class="btn" onclick="renderScenario();go('s-host-scenario')"><i class="ti ti-file-description"></i> View scenario</button>`;
 }
 
 function doElim(uid){
