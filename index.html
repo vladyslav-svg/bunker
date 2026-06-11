@@ -490,15 +490,20 @@ function joinGame(){
   P={code,name,phase:'lobby',card:null,meta:null,round:1,aliveCount:0,totalCount:0,eliminated:false};
   localStorage.setItem('bunker-last',JSON.stringify({code,name}));
 
-  // Reuse existing peer or create new anonymous one
-  if(myPeer&&!myPeer.destroyed&&myPeer.id){
-    connectToHost(code, name);
-  } else {
-    if(myPeer&&!myPeer.destroyed)myPeer.destroy();
-    myPeer=new Peer();
-    myPeer.on('open',()=>connectToHost(code,name));
-    myPeer.on('error',err=>showJoinErr(err.type));
-  }
+  // Always create a fresh peer so error handlers are clean
+  if(myPeer&&!myPeer.destroyed) myPeer.destroy();
+  myPeer=new Peer();
+
+  myPeer.on('error', err=>{
+    if(err.type==='peer-unavailable'){
+      showJoinErr('Game not found. Check the code.');
+    } else {
+      showJoinErr('Connection error: '+err.type);
+    }
+    resetJoinBtn();
+  });
+
+  myPeer.on('open', ()=>connectToHost(code, name));
 
   $('btn-do-join').disabled=true;
   $('btn-do-join').innerHTML='<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Connecting…';
@@ -521,7 +526,6 @@ function connectToHost(code, name){
     if(P.phase==='lobby'){
       showJoinErr('Host not found or disconnected.');
     } else {
-      $('join-err').textContent='';
       renderPlayerGame('Host disconnected — game paused.');
     }
     resetJoinBtn();
@@ -531,15 +535,6 @@ function connectToHost(code, name){
     showJoinErr('Could not connect: '+err.type);
     resetJoinBtn();
   });
-
-  // Timeout if no response in 8 seconds
-  setTimeout(()=>{
-    if(P.phase==='lobby'&&(!hostConn||!hostConn.open)){
-      showJoinErr('Game not found. Check the code.');
-      resetJoinBtn();
-      go('s-join');
-    }
-  },8000);
 }
 
 function resetJoinBtn(){
